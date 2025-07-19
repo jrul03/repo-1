@@ -1,0 +1,260 @@
+{
+  "id": "1",
+  "name": "AI Climate Digest",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "time",
+              "hour": 8,
+              "minute": 0
+            }
+          ]
+        }
+      },
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "id": "1",
+      "position": [
+        300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "GET",
+        "url": "https://newsapi.org/v2/everything",
+        "qs": {
+          "q": "climate change",
+          "language": "en",
+          "sortBy": "publishedAt"
+        },
+        "authentication": "basicAuth",
+        "user": "=\"\"",
+        "password": "={{$env.NEWS_API_KEY}}",
+        "allowUnauthorizedCerts": false,
+        "responseFormat": "json"
+      },
+      "name": "Fetch Climate News",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "id": "2",
+      "position": [
+        500,
+        300
+      ],
+      "credentials": {
+        "httpBasicAuth": {
+          "name": "NewsAPI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{Array.isArray($json.articles) ? $json.articles.length : 0}}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "name": "Have Articles?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "id": "3",
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "={{$env.OPENAI_MODEL || 'gpt-4o-mini'}}",
+        "prompt": "=You are ClimateDigestAI. Summarize the following news articles in 5 bullet points and include an optimistic takeaway:\n\n{{$json[\"articles\"]}}"
+      },
+      "name": "Summarize with OpenAI",
+      "type": "n8n-nodes-base.openai",
+      "typeVersion": 1,
+      "id": "4",
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "openAiApi": {
+          "name": "OpenAI_Main"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "text",
+              "value": "={{$json[\"choices\"][0][\"text\"]}}"
+            },
+            {
+              "name": "html",
+              "value": "=<p>{{$json[\"choices\"][0][\"text\"].replace(/\n/g, '<br>')}}</p>"
+            }
+          ]
+        }
+      },
+      "name": "Format Email",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "id": "5",
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "wait"
+      },
+      "name": "Gate Email",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 1,
+      "id": "6",
+      "position": [
+        1300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{$env.DIGEST_FROM || 'digest@example.com'}}",
+        "toEmail": "={{$env.DIGEST_TO}}",
+        "subject": "Daily Climate News Digest",
+        "text": "={{$json.text}}",
+        "html": "={{$json.html}}"
+      },
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "id": "7",
+      "position": [
+        1500,
+        300
+      ],
+      "credentials": {
+        "smtp": {
+          "name": "DigestMailer"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "keepOnlySet": true,
+        "values": {
+          "string": [
+            {
+              "name": "warning",
+              "value": "No articles returned from NewsAPI"
+            }
+          ]
+        }
+      },
+      "name": "Log Warning",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "id": "8",
+      "position": [
+        900,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Climate News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Climate News": {
+      "main": [
+        [
+          {
+            "node": "Have Articles?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Gate Email",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Have Articles?": {
+      "main": [
+        [
+          {
+            "node": "Summarize with OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Warning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize with OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Format Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Email": {
+      "main": [
+        [
+          {
+            "node": "Gate Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gate Email": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "versionId": "1",
+  "settings": {}
+}
