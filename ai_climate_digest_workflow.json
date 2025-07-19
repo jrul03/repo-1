@@ -1,0 +1,117 @@
+{
+  "id": "1",
+  "name": "AI Climate Digest",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "time",
+              "hour": 8,
+              "minute": 0
+            }
+          ]
+        }
+      },
+      "name": "Daily Trigger",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "id": "1",
+      "position": [
+        300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "requestMethod": "GET",
+        "url": "https://newsapi.org/v2/everything",
+        "qs": {
+          "q": "climate change",
+          "language": "en",
+          "sortBy": "publishedAt",
+          "apiKey": "={{$env.NEWS_API_KEY}}"
+        },
+        "allowUnauthorizedCerts": false,
+        "responseFormat": "json"
+      },
+      "name": "Fetch Climate News",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2,
+      "id": "2",
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "model": "gpt-3.5-turbo",
+        "prompt": "=You are ClimateDigestAI. Summarize the following news articles in 5 bullet points and include an optimistic takeaway:\n\n{{$json[\"articles\"]}}"
+      },
+      "name": "Summarize with OpenAI",
+      "type": "n8n-nodes-base.openai",
+      "typeVersion": 1,
+      "id": "3",
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "fromEmail": "digest@example.com",
+        "toEmail": "={{$env.DIGEST_TO}}",
+        "subject": "Daily Climate News Digest",
+        "text": "={{$json[\"choices\"][0][\"text\"]}}"
+      },
+      "name": "Send Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 1,
+      "id": "4",
+      "position": [
+        900,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Daily Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Climate News",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Climate News": {
+      "main": [
+        [
+          {
+            "node": "Summarize with OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize with OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Send Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "versionId": "1",
+  "settings": {}
+}
